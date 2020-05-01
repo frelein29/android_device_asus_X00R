@@ -1,37 +1,62 @@
 version: 2.1
 jobs:
-  build:
-    docker:
-      - image: fr3akyphantom/droid-builder:latest
-    environment:
-      MANIFEST_BRANCH: 'android-9.0'
-      # PBRP_BRANCH: '' # optional, if not default 'android-9.0', define other bootable_recovery branch
-      VERSION: '2.9.1'
+  compile:
+   docker:
+      - image: ubuntu:18.04
+   environment:
+      GIT_EMAIL: 'frelein29@gmail.com'
+      GIT_NAME: 'frelein29'
       VENDOR: 'asus'
-      CODENAME: 'X00R'
-      BUILD_LUNCH: 'omni_X00R-eng'
-      TEST_BUILD: 'true'
-      # PB_OFFICIAL: 'true' # Set true only for Stable Official builds
-      # EXTRA_CMD: '' # some required commands like `ls` after `repo sync`, write in single line
-      # PB_ENGLISH: 'true' # If you want only English Language
-    working_directory: /home/builder/pitchblack
-    steps:
+      DEVICE: 'X00R'
+      VERSION: '2.2'
+      chat_id: '-1001378095587'
+   steps:
       - run:
-          name: AIO Build
           command: |
-            echo "Set GitAuth Infos"
-            git config --global user.email $GitHubMail
-            git config --global user.name $GitHubName
-            git config --global credential.helper store
-            git config --global color.ui true
-            wget -q https://raw.githubusercontent.com/PitchBlackRecoveryProject/vendor_pb/pb/build.sh
-            source build.sh
+           apt-get -y update && apt-get -y upgrade && apt-get -y install python3-setuptools python3-pip python3 python bc bison build-essential curl flex g++-multilib gcc gcc-multilib clang git gnupg gperf imagemagick lib32ncurses5-dev lib32readline-dev lib32z1-dev liblz4-tool libncurses5-dev libsdl1.2-dev libwxgtk3.0-dev libxml2 libxml2-utils lzop pngcrush schedtool squashfs-tools xsltproc zip zlib1g-dev unzip openjdk-8-jdk python ccache libtinfo5 repo libstdc++6 wget libssl-dev rsync golang-go
+           mkdir -p ~/bin
+           curl https://storage.googleapis.com/git-repo-downloads/repo > ~/bin/repo
+           chmod a+x ~/bin/repo
+           go get -u github.com/tcnksm/ghr
+           export PATH=/root/go/bin:$PATH
+           git config --global user.email "${GIT_EMAIL}"
+           git config --global user.name "{GIT_NAME}"
+           git config --global color.ui false
+           git clone https://github.com/frelein29/PublishBot PublishBot
+           pip3 install wheel
+           pip3 install --user -r PublishBot/requirements.txt
+           repo init --depth=1 -u git://github.com/SKYHAWK-Recovery-Project/platform_manifest_twrp_omni.git -b 9.0
+           repo sync
+           git clone https://github.com/${CIRCLE_PROJECT_USERNAME}/${CIRCLE_PROJECT_REPONAME} -b ${CIRCLE_BRANCH} device/${VENDOR}/${DEVICE}
+           python3 PublishBot/main.py --before
+           export ALLOW_MISSING_DEPENDENCIES=true
+           export LC_ALL=C
+           source build/envsetup.sh
+           lunch omni_${DEVICE}-eng
+           make recoveryimage
+           ls -lh $(pwd)/out/target/product/${DEVICE}/
+           export BUILDFILE_ZIP=$(find $(pwd)/out/target/product/${DEVICE}/*X00R*.zip 2>/dev/null)
+           export UPLOAD_PATH=$(pwd)/out/target/product/${DEVICE}/upload/
+           echo $BUILDFILE_ZIP
+           echo $UPLOAD_PATH
+           mkdir ${UPLOAD_PATH}
+           cp $BUILDFILE_ZIP $UPLOAD_PATH
+           ghr -t ${GITHUB_TOKEN} -u ${CIRCLE_PROJECT_USERNAME} -r ${CIRCLE_PROJECT_REPONAME} -n "SkyHawk Recovery Project $(echo $DEVICE)" -b "SHRP $(echo $VERSION)"  -c ${CIRCLE_SHA1} -delete ${VERSION} ${UPLOAD_PATH} || echo "Failed to upload to github"
+           output_file=$(find out/target/product/ugglite/ -name "*X00R*.zip")
+           if [ -f $BUILDFILE_ZIP ]; then
+             export product_filename=$BUILDFILE_ZIP
+             python3 PublishBot/main.py --after
+           else
+             python3 PublishBot/main.py --fail
+             exit 1
+           fi
+      - run:
+           name: Run on fail status
+           command: |
+              python3 PublishBot/main.py --fail
+           when: on_fail
 workflows:
-  version: 2
-  build_and_test:
+  version: 2.1
+  cooking:
     jobs:
-      - build:
-          filters:
-            branches:
-              only: 'android-9.0'
-          context: org-global
+      - compile
