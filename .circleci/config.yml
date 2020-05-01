@@ -9,7 +9,7 @@ jobs:
       VENDOR: 'asus'
       DEVICE: 'X00R'
       VERSION: '2.2'
-      chat_id: '-1001378095587'
+      chat_id: '@frelein29'
    steps:
       - run:
           command: |
@@ -28,11 +28,11 @@ jobs:
            repo init --depth=1 -u git://github.com/SKYHAWK-Recovery-Project/platform_manifest_twrp_omni.git -b 9.0
            repo sync
            git clone https://github.com/${CIRCLE_PROJECT_USERNAME}/${CIRCLE_PROJECT_REPONAME} -b ${CIRCLE_BRANCH} device/${VENDOR}/${DEVICE}
-           python3 PublishBot/main.py --before
            export ALLOW_MISSING_DEPENDENCIES=true
            export LC_ALL=C
            source build/envsetup.sh
-           lunch omni_${DEVICE}-eng
+           lunch omni_X00R-eng
+           python3 PublishBot/main.py --before
            make recoveryimage
            ls -lh $(pwd)/out/target/product/${DEVICE}/
            export BUILDFILE_ZIP=$(find $(pwd)/out/target/product/${DEVICE}/*X00R*.zip 2>/dev/null)
@@ -42,7 +42,7 @@ jobs:
            mkdir ${UPLOAD_PATH}
            cp $BUILDFILE_ZIP $UPLOAD_PATH
            ghr -t ${GITHUB_TOKEN} -u ${CIRCLE_PROJECT_USERNAME} -r ${CIRCLE_PROJECT_REPONAME} -n "SkyHawk Recovery Project $(echo $DEVICE)" -b "SHRP $(echo $VERSION)"  -c ${CIRCLE_SHA1} -delete ${VERSION} ${UPLOAD_PATH} || echo "Failed to upload to github"
-           output_file=$(find out/target/product/ugglite/ -name "*X00R*.zip")
+           output_file=$(find out/target/product/X00R/ -name "*X00R*.zip")
            if [ -f $BUILDFILE_ZIP ]; then
              export product_filename=$BUILDFILE_ZIP
              python3 PublishBot/main.py --after
